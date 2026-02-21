@@ -5,13 +5,34 @@ import { HelloWave } from '@/components/hello-wave';
 import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-//import AsyncStorage from "@react-native-async-storage/async-storage";
+
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Location from "expo-location";
 import { Link } from 'expo-router';
 import * as SMS from "expo-sms";
+import * as TaskManager from "expo-task-manager";
+import { TaskManagerTaskBody } from "expo-task-manager";
 import { Text, TouchableOpacity, Vibration } from "react-native";
 
+const LOCATION_TASK = "background-location-task";
+
+TaskManager.defineTask(
+  LOCATION_TASK,
+  ({ data, error }:TaskManagerTaskBody) => {
+    if (error) return;
+
+    if (data) {
+      const { locations } = data as any;
+      const loc = locations[0];
+
+      console.log(
+        "Background location:",
+        loc.coords.latitude,
+        loc.coords.longitude
+      );
+    }
+  }
+);
 export default function HomeScreen() {
   const handleSOS = async () => {
   Vibration.vibrate(1000);
@@ -52,7 +73,32 @@ export default function HomeScreen() {
   // Send SMS
   await SMS.sendSMSAsync(numbers, message);
 };
-  return (
+ const startTracking = async () => {
+  const { status } = await Location.requestBackgroundPermissionsAsync();
+
+  if (status !== "granted") {
+    alert("Permission denied");
+    return;
+  }
+
+  const alreadyStarted =
+    await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK);
+
+  if (alreadyStarted) {
+    alert("Tracking already running");
+    return;
+  }
+
+  await Location.startLocationUpdatesAsync(LOCATION_TASK, {
+    accuracy: Location.Accuracy.High,
+    timeInterval: 5000,
+    distanceInterval: 5,
+    showsBackgroundLocationIndicator: true,
+  });
+
+  alert("Background tracking started");
+};
+return (
     <ParallaxScrollView
       headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
       headerImage={
@@ -62,14 +108,26 @@ export default function HomeScreen() {
         />
       }>
       <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">My Safety App 🚀</ThemedText>
-        <HelloWave />
-      <TouchableOpacity
-  style={styles.sosButton}
-onPress={handleSOS}>
-  <Text style={styles.sosText}>SOS</Text>
-</TouchableOpacity>
-      </ThemedView>
+  <ThemedText type="title">My Safety App 🚀</ThemedText>
+  <HelloWave />
+
+  {/* SOS BUTTON */}
+  <TouchableOpacity
+    style={styles.sosButton}
+    onPress={handleSOS}
+  >
+    <Text style={styles.sosText}>SOS</Text>
+  </TouchableOpacity>
+
+  {/* START TRACKING BUTTON */}
+  <TouchableOpacity
+    style={[styles.sosButton, { backgroundColor: "blue" }]}
+    onPress={startTracking}
+  >
+    <Text style={styles.sosText}>Start Tracking</Text>
+  </TouchableOpacity>
+
+</ThemedView>
       <ThemedView style={styles.stepContainer}>
         <ThemedText type="subtitle">Step 1: Try it</ThemedText>
         <ThemedText>
@@ -129,33 +187,35 @@ onPress={handleSOS}>
 
 const styles = StyleSheet.create({
   titleContainer: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
   },
+
   stepContainer: {
     gap: 8,
     marginBottom: 8,
+    paddingHorizontal: 20,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
-  sosButton: {
-  marginTop: 20,
-  backgroundColor: "red",
-  paddingVertical: 20,
-  paddingHorizontal: 60,
-  borderRadius: 100,
-  alignItems: "center",
-},
 
-sosText: {
-  color: "white",
-  fontSize: 24,
-  fontWeight: "bold",
-},
+  reactLogo: {
+    height: 150,
+    width: "100%",
+    resizeMode: "contain",
+  },
+
+  sosButton: {
+    marginTop: 20,
+    backgroundColor: "red",
+    paddingVertical: 20,
+    width: "80%",
+    borderRadius: 100,
+    alignItems: "center",
+  },
+
+  sosText: {
+    color: "white",
+    fontSize: 22,
+    fontWeight: "bold",
+  },
 });
