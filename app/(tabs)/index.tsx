@@ -5,21 +5,52 @@ import { HelloWave } from '@/components/hello-wave';
 import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+//import AsyncStorage from "@react-native-async-storage/async-storage";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Location from "expo-location";
 import { Link } from 'expo-router';
+import * as SMS from "expo-sms";
 import { Text, TouchableOpacity, Vibration } from "react-native";
+
 export default function HomeScreen() {
   const handleSOS = async () => {
   Vibration.vibrate(1000);
 
-  const { status } = await Location.requestForegroundPermissionsAsync();
-  if (status !== "granted") {
-    alert("Permission denied");
+  // Get saved contacts
+  const saved = await AsyncStorage.getItem("emergencyContacts");
+
+  if (!saved) {
+    alert("No emergency contact saved");
     return;
   }
 
+  const numbers = JSON.parse(saved);
+
+  // Ask location permission
+  const { status } = await Location.requestForegroundPermissionsAsync();
+  if (status !== "granted") {
+    alert("Location permission denied");
+    return;
+  }
+
+  // Get location
   const loc = await Location.getCurrentPositionAsync({});
-  alert(`Lat: ${loc.coords.latitude}\nLng: ${loc.coords.longitude}`);
+
+  const message =
+    `🚨 SOS EMERGENCY 🚨\n` +
+    `I need help!\n` +
+    `Location:\n` +
+    `https://maps.google.com/?q=${loc.coords.latitude},${loc.coords.longitude}`;
+
+  // Check if SMS available
+  const isAvailable = await SMS.isAvailableAsync();
+  if (!isAvailable) {
+    alert("SMS not supported on this device");
+    return;
+  }
+
+  // Send SMS
+  await SMS.sendSMSAsync(numbers, message);
 };
   return (
     <ParallaxScrollView
